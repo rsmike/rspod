@@ -180,6 +180,7 @@ async function assembleChunks(uploadId, originalName, totalChunks) {
   if (path.extname(finalName).toLowerCase() === '.mp4') {
     const probe = await ffprobe(finalPath);
     if (!probe.compatible) {
+      console.log(`Incompatible codec in ${finalName} (${probe.videoCodec}/${probe.audioCodec}), transcoding...`);
       transcodeFile(finalPath).catch((err) => {
         console.error(`Transcode failed for ${finalName}:`, err.message);
       });
@@ -217,6 +218,7 @@ function transcodeFile(filePath) {
   const name = path.basename(filePath);
   const tmpPath = filePath + '.transcoding.mp4';
   transcoding.add(name);
+  console.log(`Transcode started: ${name}`);
 
   return new Promise((resolve, reject) => {
     execFile('ffmpeg', [
@@ -225,10 +227,12 @@ function transcodeFile(filePath) {
     ], (err) => {
       transcoding.delete(name);
       if (err) {
+        console.error(`Transcode failed: ${name} — ${err.message}`);
         try { fs.unlinkSync(tmpPath); } catch {}
         return reject(err);
       }
       fs.renameSync(tmpPath, filePath);
+      console.log(`Transcode done: ${name}`);
       resolve();
     });
   });
@@ -254,11 +258,13 @@ app.get('/api/files', async (req, res) => {
 // Upload files
 app.post('/api/files', upload.array('files'), async (req, res) => {
   const uploaded = (req.files || []).map((f) => f.filename);
+  for (const name of uploaded) console.log(`Uploaded: ${name}`);
   // Auto-transcode incompatible MP4s in background
   for (const f of req.files || []) {
     if (path.extname(f.filename).toLowerCase() === '.mp4') {
       const probe = await ffprobe(f.path);
       if (!probe.compatible) {
+        console.log(`Incompatible codec in ${f.filename} (${probe.videoCodec}/${probe.audioCodec}), transcoding...`);
         transcodeFile(f.path).catch((err) => {
           console.error(`Transcode failed for ${f.filename}:`, err.message);
         });
@@ -279,9 +285,13 @@ app.post('/api/files/chunk', chunkUpload.single('chunk'), async (req, res) => {
   const idx = parseInt(chunkIndex, 10);
   const total = parseInt(totalChunks, 10);
 
+  console.log(`Chunk ${idx + 1}/${total} for ${filename}`);
+
   // Check if all chunks are uploaded
   if (idx === total - 1) {
+    console.log(`Assembling ${total} chunks for ${filename}...`);
     const name = await assembleChunks(uploadId, filename, total);
+    console.log(`Assembled: ${name}`);
     return res.json({ done: true, name });
   }
 
@@ -313,6 +323,7 @@ app.patch('/api/files/:filename', (req, res) => {
   }
 
   fs.renameSync(oldPath, newPath);
+  console.log(`Renamed: ${oldName} -> ${newName}`);
   res.json({ name: newName });
 });
 
@@ -326,6 +337,7 @@ app.delete('/api/files/:filename', (req, res) => {
   }
 
   fs.unlinkSync(filePath);
+  console.log(`Deleted: ${name}`);
   res.json({ deleted: name });
 });
 
@@ -357,6 +369,7 @@ app.put('/api/settings', (req, res) => {
   const { title, author, description, language, explicit } = req.body;
   const settings = { title, author, description, language, explicit: !!explicit };
   writeSettings(settings);
+  console.log(`Settings saved: ${settings.title}`);
   res.json(settings);
 });
 
@@ -365,6 +378,7 @@ app.post('/api/cover', coverUpload.single('cover'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No image uploaded' });
   }
+  console.log('Cover image uploaded');
   res.json({ ok: true });
 });
 
