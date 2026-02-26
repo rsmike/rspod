@@ -1,20 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import FileManager from './FileManager';
+import Settings from './Settings';
 import './App.css';
 
 export default function App() {
-  const [status, setStatus] = useState(null);
-
-  useEffect(() => {
-    fetch('/api/health')
-      .then((res) => res.json())
-      .then((data) => setStatus(data.status))
-      .catch(() => setStatus('error'));
-  }, []);
+  const [tab, setTab] = useState('files');
 
   return (
     <div className="app">
-      <h1>rspod</h1>
-      <p>API status: {status ?? 'loading...'}</p>
+      <header>
+        <h1>rspod</h1>
+        <nav>
+          <button
+            className={tab === 'files' ? 'active' : ''}
+            onClick={() => setTab('files')}
+          >
+            Files
+          </button>
+          <button
+            className={tab === 'settings' ? 'active' : ''}
+            onClick={() => setTab('settings')}
+          >
+            Settings
+          </button>
+        </nav>
+      </header>
+      <main>
+        {tab === 'files' ? <FileManager /> : <Settings />}
+      </main>
     </div>
   );
 }

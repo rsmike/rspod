@@ -14,5 +14,8 @@ RUN npm ci --prefix server --omit=dev
 COPY server/ ./server/
 COPY --from=build /app/client/dist ./client/dist
 
+RUN mkdir -p /media
+VOLUME /media
+
 EXPOSE 3000
 CMD ["node", "server/index.js"]
