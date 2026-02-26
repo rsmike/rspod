@@ -348,6 +348,8 @@ app.delete('/api/files/:filename', (req, res) => {
   }
 
   fs.unlinkSync(filePath);
+  const transcodingPath = filePath + '.transcoding.mp4';
+  try { fs.unlinkSync(transcodingPath); } catch {}
   console.log(`Deleted: ${name}`);
   res.json({ deleted: name });
 });
