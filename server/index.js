@@ -6,7 +6,7 @@ const { parseFile } = require('music-metadata');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const MEDIA_DIR = process.env.MEDIA_DIR || '/media';
+const MEDIA_DIR = fs.existsSync('/media') ? '/media' : path.join(__dirname, '..', 'media');
 const SETTINGS_FILE = path.join(MEDIA_DIR, '.rspod.json');
 const COVER_FILE = path.join(MEDIA_DIR, 'cover.jpg');
 const ALLOWED_EXT = ['.mp3', '.mp4'];
