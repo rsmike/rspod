@@ -1,0 +1,15 @@
+{
+  "name": "rspod",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build": "npm run build --prefix client",
+    "start": "node server/index.js",
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client",
+    "docker:build": "docker build -t rspod .",
+    "docker:run": "docker run -p 3000:3000 rspod"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
