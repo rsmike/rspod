@@ -35,6 +35,14 @@ export default function FileManager() {
     loadFiles();
   }, [loadFiles]);
 
+  // Poll while any file is transcoding
+  useEffect(() => {
+    const hasTranscoding = files.some((f) => f.transcoding);
+    if (!hasTranscoding) return;
+    const interval = setInterval(loadFiles, 3000);
+    return () => clearInterval(interval);
+  }, [files, loadFiles]);
+
   const uploadFiles = async (fileList) => {
     const valid = Array.from(fileList).filter((f) => {
       const ext = f.name.split('.').pop().toLowerCase();
@@ -101,6 +109,11 @@ export default function FileManager() {
     loadFiles();
   };
 
+  const handleTranscode = async (name) => {
+    await fetch(`/api/files/${encodeURIComponent(name)}/transcode`, { method: 'POST' });
+    loadFiles();
+  };
+
   return (
     <>
       <div
@@ -153,6 +166,7 @@ export default function FileManager() {
                 formatDuration={formatDuration}
                 onRename={handleRename}
                 onDelete={handleDelete}
+                onTranscode={handleTranscode}
               />
             ))}
           </tbody>

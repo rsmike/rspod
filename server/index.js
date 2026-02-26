@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const { execFile } = require('child_process');
 const multer = require('multer');
 const { parseFile } = require('music-metadata');
 
@@ -79,6 +80,7 @@ async function getMediaFiles() {
   const entries = fs.readdirSync(MEDIA_DIR);
   const files = [];
   for (const name of entries) {
+    if (name.includes('.transcoding.')) continue;
     const ext = path.extname(name).toLowerCase();
     if (!ALLOWED_EXT.includes(ext)) continue;
     const filePath = path.join(MEDIA_DIR, name);
@@ -88,11 +90,18 @@ async function getMediaFiles() {
       const metadata = await parseFile(filePath);
       duration = Math.round(metadata.format.duration || 0);
     } catch {}
+    let compatible = true;
+    if (ext === '.mp4' && !transcoding.has(name)) {
+      const probe = await ffprobe(filePath);
+      compatible = probe.compatible;
+    }
     files.push({
       name,
       size: stat.size,
       duration,
       mtime: stat.mtime.toISOString(),
+      compatible: ext === '.mp3' ? true : compatible,
+      transcoding: transcoding.has(name),
     });
   }
   files.sort((a, b) => new Date(b.mtime) - new Date(a.mtime));
@@ -122,6 +131,51 @@ function getMimeType(filename) {
   return ext === '.mp4' ? 'video/mp4' : 'audio/mpeg';
 }
 
+// --- Codec check & transcode ---
+const transcoding = new Set();
+
+function ffprobe(filePath) {
+  return new Promise((resolve) => {
+    execFile('ffprobe', [
+      '-v', 'quiet', '-print_format', 'json', '-show_streams', filePath,
+    ], (err, stdout) => {
+      if (err) return resolve({ videoCodec: null, audioCodec: null, compatible: false });
+      try {
+        const { streams } = JSON.parse(stdout);
+        const video = streams.find((s) => s.codec_type === 'video');
+        const audio = streams.find((s) => s.codec_type === 'audio');
+        const videoCodec = video?.codec_name || null;
+        const audioCodec = audio?.codec_name || null;
+        const compatible = videoCodec === 'h264' && (audioCodec === 'aac' || !audio);
+        resolve({ videoCodec, audioCodec, compatible });
+      } catch {
+        resolve({ videoCodec: null, audioCodec: null, compatible: false });
+      }
+    });
+  });
+}
+
+function transcodeFile(filePath) {
+  const name = path.basename(filePath);
+  const tmpPath = filePath + '.transcoding.mp4';
+  transcoding.add(name);
+
+  return new Promise((resolve, reject) => {
+    execFile('ffmpeg', [
+      '-i', filePath, '-c:v', 'libx264', '-c:a', 'aac',
+      '-movflags', '+faststart', '-y', tmpPath,
+    ], (err) => {
+      transcoding.delete(name);
+      if (err) {
+        try { fs.unlinkSync(tmpPath); } catch {}
+        return reject(err);
+      }
+      fs.renameSync(tmpPath, filePath);
+      resolve();
+    });
+  });
+}
+
 // Sanitize filename to prevent path traversal
 function sanitizeFilename(name) {
   return path.basename(String(name));
@@ -140,25 +194,36 @@ app.get('/api/files', async (req, res) => {
 });
 
 // Upload files
-app.post('/api/files', upload.array('files'), (req, res) => {
+app.post('/api/files', upload.array('files'), async (req, res) => {
   const uploaded = (req.files || []).map((f) => f.filename);
+  // Auto-transcode incompatible MP4s in background
+  for (const f of req.files || []) {
+    if (path.extname(f.filename).toLowerCase() === '.mp4') {
+      const probe = await ffprobe(f.path);
+      if (!probe.compatible) {
+        transcodeFile(f.path).catch((err) => {
+          console.error(`Transcode failed for ${f.filename}:`, err.message);
+        });
+      }
+    }
+  }
   res.json({ uploaded });
 });
 
-// Rename file
+// Rename file (receives base name without extension)
 app.patch('/api/files/:filename', (req, res) => {
   const oldName = sanitizeFilename(req.params.filename);
-  const newName = sanitizeFilename(req.body.name);
+  const baseName = String(req.body.name || '').trim();
 
-  if (!newName || newName.startsWith('.')) {
+  if (!baseName || baseName.startsWith('.')) {
     return res.status(400).json({ error: 'Invalid filename' });
   }
-
-  const ext = path.extname(newName).toLowerCase();
-  if (!ALLOWED_EXT.includes(ext)) {
-    return res.status(400).json({ error: 'File must have .mp3 or .mp4 extension' });
+  if (transcoding.has(oldName)) {
+    return res.status(409).json({ error: 'File is currently being transcoded' });
   }
 
+  const ext = path.extname(oldName);
+  const newName = baseName + ext;
   const oldPath = path.join(MEDIA_DIR, oldName);
   const newPath = path.join(MEDIA_DIR, newName);
 
@@ -184,6 +249,24 @@ app.delete('/api/files/:filename', (req, res) => {
 
   fs.unlinkSync(filePath);
   res.json({ deleted: name });
+});
+
+// Transcode file
+app.post('/api/files/:filename/transcode', async (req, res) => {
+  const name = sanitizeFilename(req.params.filename);
+  const filePath = path.join(MEDIA_DIR, name);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+  if (transcoding.has(name)) {
+    return res.status(409).json({ error: 'Already transcoding' });
+  }
+
+  transcodeFile(filePath).catch((err) => {
+    console.error(`Transcode failed for ${name}:`, err.message);
+  });
+  res.json({ transcoding: true });
 });
 
 // Get settings
@@ -230,6 +313,7 @@ app.get('/podcast', async (req, res) => {
 
   let items = '';
   for (const file of files) {
+    if (!file.compatible || file.transcoding) continue;
     const enclosureUrl = `${baseUrl}/media/${encodeURIComponent(file.name)}`;
     items += `
     <item>
