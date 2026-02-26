@@ -45,6 +45,19 @@ export default function FileManager() {
 
   const CHUNK_SIZE = 50 * 1024 * 1024; // 50MB
 
+  const uploadChunkWithRetry = async (fd, retries = 3) => {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        const res = await fetch('/api/files/chunk', { method: 'POST', body: fd });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return;
+      } catch (err) {
+        if (attempt === retries - 1) throw err;
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      }
+    }
+  };
+
   const uploadFileChunked = async (file, fileIndex, totalFiles) => {
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
     const uploadId = `${Date.now()}-${fileIndex}`;
@@ -59,7 +72,7 @@ export default function FileManager() {
       fd.append('filename', file.name);
       fd.append('chunk', chunk);
 
-      await fetch('/api/files/chunk', { method: 'POST', body: fd });
+      await uploadChunkWithRetry(fd);
 
       setUploading({
         file: fileIndex + 1,
@@ -77,9 +90,13 @@ export default function FileManager() {
     });
     if (valid.length === 0) return;
 
-    for (let i = 0; i < valid.length; i++) {
-      setUploading({ file: i + 1, totalFiles: valid.length, chunk: 0, totalChunks: 0 });
-      await uploadFileChunked(valid[i], i, valid.length);
+    try {
+      for (let i = 0; i < valid.length; i++) {
+        setUploading({ file: i + 1, totalFiles: valid.length, chunk: 0, totalChunks: 0 });
+        await uploadFileChunked(valid[i], i, valid.length);
+      }
+    } catch (err) {
+      alert(`Upload failed: ${err.message}`);
     }
 
     setUploading(null);
