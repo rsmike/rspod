@@ -17,13 +17,23 @@ fs.mkdirSync(MEDIA_DIR, { recursive: true });
 app.use(express.json());
 
 // --- File upload config ---
+// Decode non-latin filenames (multer gives Latin-1 encoded originalname)
+function decodeFilename(name) {
+  try {
+    return Buffer.from(name, 'latin1').toString('utf8');
+  } catch {
+    return name;
+  }
+}
+
 const storage = multer.diskStorage({
   destination: MEDIA_DIR,
   filename: (req, file, cb) => {
     // Keep original filename, avoid overwrite by appending number
-    const ext = path.extname(file.originalname);
-    const base = path.basename(file.originalname, ext);
-    let name = file.originalname;
+    const decoded = decodeFilename(file.originalname);
+    const ext = path.extname(decoded);
+    const base = path.basename(decoded, ext);
+    let name = `${base}${ext}`;
     let i = 1;
     while (fs.existsSync(path.join(MEDIA_DIR, name))) {
       name = `${base} (${i})${ext}`;
