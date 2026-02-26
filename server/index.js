@@ -11,6 +11,7 @@ const MEDIA_DIR = fs.existsSync('/media') ? '/media' : path.join(__dirname, '..'
 const SETTINGS_FILE = path.join(MEDIA_DIR, '.rspod.json');
 const COVER_FILE = path.join(MEDIA_DIR, 'cover.jpg');
 const ALLOWED_EXT = ['.mp3', '.mp4'];
+const MAX_TRANSCODE_SIZE = 100 * 1024 * 1024; // 100MB
 const CHUNKS_DIR = path.join(MEDIA_DIR, '.chunks');
 
 // Ensure directories exist
@@ -176,14 +177,19 @@ async function assembleChunks(uploadId, originalName, totalChunks) {
   // Clean up chunks
   fs.rmSync(chunkDir, { recursive: true, force: true });
 
-  // Auto-transcode if needed
+  // Auto-transcode if needed (skip large files)
   if (path.extname(finalName).toLowerCase() === '.mp4') {
     const probe = await ffprobe(finalPath);
     if (!probe.compatible) {
-      console.log(`Incompatible codec in ${finalName} (${probe.videoCodec}/${probe.audioCodec}), transcoding...`);
-      transcodeFile(finalPath).catch((err) => {
-        console.error(`Transcode failed for ${finalName}:`, err.message);
-      });
+      const stat = fs.statSync(finalPath);
+      if (stat.size > MAX_TRANSCODE_SIZE) {
+        console.log(`Incompatible codec in ${finalName} (${probe.videoCodec}/${probe.audioCodec}), too large to transcode (${(stat.size / 1048576).toFixed(0)}MB)`);
+      } else {
+        console.log(`Incompatible codec in ${finalName} (${probe.videoCodec}/${probe.audioCodec}), transcoding...`);
+        transcodeFile(finalPath).catch((err) => {
+          console.error(`Transcode failed for ${finalName}:`, err.message);
+        });
+      }
     }
   }
 
@@ -259,15 +265,20 @@ app.get('/api/files', async (req, res) => {
 app.post('/api/files', upload.array('files'), async (req, res) => {
   const uploaded = (req.files || []).map((f) => f.filename);
   for (const name of uploaded) console.log(`Uploaded: ${name}`);
-  // Auto-transcode incompatible MP4s in background
+  // Auto-transcode incompatible MP4s in background (skip large files)
   for (const f of req.files || []) {
     if (path.extname(f.filename).toLowerCase() === '.mp4') {
       const probe = await ffprobe(f.path);
       if (!probe.compatible) {
-        console.log(`Incompatible codec in ${f.filename} (${probe.videoCodec}/${probe.audioCodec}), transcoding...`);
-        transcodeFile(f.path).catch((err) => {
-          console.error(`Transcode failed for ${f.filename}:`, err.message);
-        });
+        const stat = fs.statSync(f.path);
+        if (stat.size > MAX_TRANSCODE_SIZE) {
+          console.log(`Incompatible codec in ${f.filename} (${probe.videoCodec}/${probe.audioCodec}), too large to transcode (${(stat.size / 1048576).toFixed(0)}MB)`);
+        } else {
+          console.log(`Incompatible codec in ${f.filename} (${probe.videoCodec}/${probe.audioCodec}), transcoding...`);
+          transcodeFile(f.path).catch((err) => {
+            console.error(`Transcode failed for ${f.filename}:`, err.message);
+          });
+        }
       }
     }
   }
