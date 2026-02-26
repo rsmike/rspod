@@ -11,9 +11,11 @@ const MEDIA_DIR = fs.existsSync('/media') ? '/media' : path.join(__dirname, '..'
 const SETTINGS_FILE = path.join(MEDIA_DIR, '.rspod.json');
 const COVER_FILE = path.join(MEDIA_DIR, 'cover.jpg');
 const ALLOWED_EXT = ['.mp3', '.mp4'];
+const CHUNKS_DIR = path.join(MEDIA_DIR, '.chunks');
 
-// Ensure media directory exists
+// Ensure directories exist
 fs.mkdirSync(MEDIA_DIR, { recursive: true });
+fs.mkdirSync(CHUNKS_DIR, { recursive: true });
 
 app.use(express.json());
 
@@ -80,7 +82,7 @@ async function getMediaFiles() {
   const entries = fs.readdirSync(MEDIA_DIR);
   const files = [];
   for (const name of entries) {
-    if (name.includes('.transcoding.')) continue;
+    if (name.startsWith('.') || name.includes('.transcoding.')) continue;
     const ext = path.extname(name).toLowerCase();
     if (!ALLOWED_EXT.includes(ext)) continue;
     const filePath = path.join(MEDIA_DIR, name);
@@ -129,6 +131,62 @@ function formatDuration(seconds) {
 function getMimeType(filename) {
   const ext = path.extname(filename).toLowerCase();
   return ext === '.mp4' ? 'video/mp4' : 'audio/mpeg';
+}
+
+// --- Chunked upload helpers ---
+const chunkStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadId = sanitizeFilename(req.body.uploadId || '');
+    const dir = path.join(CHUNKS_DIR, uploadId);
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, String(req.body.chunkIndex));
+  },
+});
+const chunkUpload = multer({ storage: chunkStorage });
+
+function deduplicateName(name) {
+  const ext = path.extname(name);
+  const base = path.basename(name, ext);
+  let result = name;
+  let i = 1;
+  while (fs.existsSync(path.join(MEDIA_DIR, result))) {
+    result = `${base} (${i})${ext}`;
+    i++;
+  }
+  return result;
+}
+
+async function assembleChunks(uploadId, originalName, totalChunks) {
+  const chunkDir = path.join(CHUNKS_DIR, uploadId);
+  const finalName = deduplicateName(originalName);
+  const finalPath = path.join(MEDIA_DIR, finalName);
+  const writeStream = fs.createWriteStream(finalPath);
+
+  for (let i = 0; i < totalChunks; i++) {
+    const chunkPath = path.join(chunkDir, String(i));
+    const data = fs.readFileSync(chunkPath);
+    writeStream.write(data);
+  }
+  writeStream.end();
+  await new Promise((resolve) => writeStream.on('finish', resolve));
+
+  // Clean up chunks
+  fs.rmSync(chunkDir, { recursive: true, force: true });
+
+  // Auto-transcode if needed
+  if (path.extname(finalName).toLowerCase() === '.mp4') {
+    const probe = await ffprobe(finalPath);
+    if (!probe.compatible) {
+      transcodeFile(finalPath).catch((err) => {
+        console.error(`Transcode failed for ${finalName}:`, err.message);
+      });
+    }
+  }
+
+  return finalName;
 }
 
 // --- Codec check & transcode ---
@@ -208,6 +266,26 @@ app.post('/api/files', upload.array('files'), async (req, res) => {
     }
   }
   res.json({ uploaded });
+});
+
+// Chunked upload
+app.post('/api/files/chunk', chunkUpload.single('chunk'), async (req, res) => {
+  const { uploadId, chunkIndex, totalChunks, filename } = req.body;
+
+  if (!uploadId || chunkIndex == null || !totalChunks || !filename) {
+    return res.status(400).json({ error: 'Missing chunk metadata' });
+  }
+
+  const idx = parseInt(chunkIndex, 10);
+  const total = parseInt(totalChunks, 10);
+
+  // Check if all chunks are uploaded
+  if (idx === total - 1) {
+    const name = await assembleChunks(uploadId, filename, total);
+    return res.json({ done: true, name });
+  }
+
+  res.json({ done: false, chunkIndex: idx });
 });
 
 // Rename file (receives base name without extension)

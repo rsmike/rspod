@@ -1,4 +1,4 @@
-FROM node:22-slim AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 COPY client/package*.json ./client/
@@ -6,9 +6,9 @@ RUN npm ci --prefix client
 COPY client/ ./client/
 RUN npm run build --prefix client
 
-FROM node:22-slim
+FROM node:22-alpine
 
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ffmpeg
 
 WORKDIR /app
 COPY server/package*.json ./server/

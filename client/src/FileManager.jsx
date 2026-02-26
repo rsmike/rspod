@@ -43,6 +43,33 @@ export default function FileManager() {
     return () => clearInterval(interval);
   }, [files, loadFiles]);
 
+  const CHUNK_SIZE = 50 * 1024 * 1024; // 50MB
+
+  const uploadFileChunked = async (file, fileIndex, totalFiles) => {
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const uploadId = `${Date.now()}-${fileIndex}`;
+
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * CHUNK_SIZE;
+      const chunk = file.slice(start, start + CHUNK_SIZE);
+      const fd = new FormData();
+      fd.append('uploadId', uploadId);
+      fd.append('chunkIndex', String(i));
+      fd.append('totalChunks', String(totalChunks));
+      fd.append('filename', file.name);
+      fd.append('chunk', chunk);
+
+      await fetch('/api/files/chunk', { method: 'POST', body: fd });
+
+      setUploading({
+        file: fileIndex + 1,
+        totalFiles,
+        chunk: i + 1,
+        totalChunks,
+      });
+    }
+  };
+
   const uploadFiles = async (fileList) => {
     const valid = Array.from(fileList).filter((f) => {
       const ext = f.name.split('.').pop().toLowerCase();
@@ -50,13 +77,10 @@ export default function FileManager() {
     });
     if (valid.length === 0) return;
 
-    setUploading({ current: 0, total: valid.length });
-    const fd = new FormData();
-    valid.forEach((f) => fd.append('files', f));
-
-    try {
-      await fetch('/api/files', { method: 'POST', body: fd });
-    } catch {}
+    for (let i = 0; i < valid.length; i++) {
+      setUploading({ file: i + 1, totalFiles: valid.length, chunk: 0, totalChunks: 0 });
+      await uploadFileChunked(valid[i], i, valid.length);
+    }
 
     setUploading(null);
     loadFiles();
@@ -141,7 +165,8 @@ export default function FileManager() {
 
       {uploading && (
         <div className="upload-progress">
-          Uploading {uploading.total} file{uploading.total > 1 ? 's' : ''}...
+          Uploading file {uploading.file}/{uploading.totalFiles}
+          {uploading.totalChunks > 1 && ` (chunk ${uploading.chunk}/${uploading.totalChunks})`}...
         </div>
       )}
 
