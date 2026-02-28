@@ -10,7 +10,6 @@ export default function Settings() {
   });
   const [saved, setSaved] = useState(false);
   const [coverUrl, setCoverUrl] = useState(null);
-  const [copied, setCopied] = useState(false);
   const coverInputRef = useRef(null);
 
   useEffect(() => {
@@ -49,26 +48,10 @@ export default function Settings() {
     e.target.value = '';
   };
 
-  const feedUrl = `${window.location.origin}/podcast`;
-
-  const copyFeedUrl = () => {
-    navigator.clipboard.writeText(feedUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const update = (key, value) => setSettings((s) => ({ ...s, [key]: value }));
 
   return (
     <div className="settings">
-      <div className="field">
-        <label>Feed URL</label>
-        <div className="feed-url">
-          <code>{feedUrl}</code>
-          <button onClick={copyFeedUrl}>{copied ? 'Copied!' : 'Copy'}</button>
-        </div>
-      </div>
-
       <div className="field">
         <label>Cover Image</label>
         <div className="cover-section">

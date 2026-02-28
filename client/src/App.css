@@ -373,3 +373,219 @@ nav button.active {
 .message.error {
   color: #ff4a4a;
 }
+
+/* Login */
+.login {
+  max-width: 320px;
+  margin: 30vh auto;
+  text-align: center;
+}
+
+.login h1 {
+  font-size: 1.5rem;
+  font-weight: 300;
+  letter-spacing: 0.15em;
+  margin-bottom: 2rem;
+}
+
+.login form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.login input {
+  background: #111;
+  border: 1px solid #333;
+  color: #ededed;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.95rem;
+  border-radius: 4px;
+  outline: none;
+  text-align: center;
+  font-family: inherit;
+}
+
+.login input:focus {
+  border-color: #4a9eff;
+}
+
+.login input.shake {
+  animation: shake 0.4s ease;
+  border-color: #ff4a4a;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+/* Logout */
+.logout-btn {
+  background: transparent;
+  border: 1px solid #333;
+  color: #555;
+  padding: 0.4rem 1rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  border-radius: 4px;
+  margin-left: 0.5rem;
+}
+
+.logout-btn:hover {
+  color: #ff4a4a;
+  border-color: #ff4a4a;
+}
+
+/* Feed URL bar (user view) */
+.feed-url-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.feed-url-bar code {
+  flex: 1;
+  font-size: 0.85rem;
+  color: #4a9eff;
+  word-break: break-all;
+}
+
+/* Copy button (shared) */
+.btn-copy {
+  background: #222;
+  border: none;
+  color: #ededed;
+  padding: 0.3rem 0.6rem;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.btn-copy:hover {
+  background: #333;
+}
+
+/* User Manager */
+.user-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.add-user-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.add-user-form input {
+  background: #111;
+  border: 1px solid #333;
+  color: #ededed;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  border-radius: 4px;
+  outline: none;
+  font-family: inherit;
+  flex: 1;
+  min-width: 120px;
+}
+
+.add-user-form input:focus {
+  border-color: #4a9eff;
+}
+
+.user-list {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.user-list th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #222;
+  color: #666;
+  font-weight: 500;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.user-list td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #181818;
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+
+.user-list tr:hover td {
+  background: #111;
+}
+
+.user-name {
+  font-weight: 500;
+}
+
+.user-id {
+  font-size: 0.75rem;
+  color: #666;
+  font-family: monospace;
+}
+
+.user-feed-url {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.user-feed-url code {
+  font-size: 0.8rem;
+  color: #4a9eff;
+  word-break: break-all;
+}
+
+.user-key {
+  font-size: 0.75rem;
+  color: #555;
+  margin-top: 0.25rem;
+  cursor: pointer;
+}
+
+.user-key:hover {
+  color: #ededed;
+}
+
+.user-actions {
+  white-space: nowrap;
+}
+
+.user-actions button {
+  background: transparent;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.85rem;
+  border-radius: 3px;
+}
+
+.user-actions button:hover {
+  color: #ededed;
+  background: #222;
+}
+
+.user-actions button.danger:hover {
+  color: #ff4a4a;
+  background: rgba(255, 74, 74, 0.1);
+}
