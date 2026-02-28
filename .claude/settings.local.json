@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(npm run:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(npm install:*)",
+      "Bash(lsof:*)",
+      "Bash(docker build:*)",
+      "Bash(docker:*)",
+      "Bash(curl:*)"
     ]
   }
 }
