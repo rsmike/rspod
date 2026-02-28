@@ -23,6 +23,22 @@ const FEED_TOKEN_LEN = 12;
 fs.mkdirSync(MEDIA_DIR, { recursive: true });
 fs.mkdirSync(CHUNKS_DIR, { recursive: true });
 
+// Clean up stale chunks from interrupted uploads (older than 1 hour, checked every 10 min)
+const CHUNK_MAX_AGE = 60 * 60 * 1000;
+function cleanStaleChunks() {
+  for (const entry of fs.readdirSync(CHUNKS_DIR)) {
+    const p = path.join(CHUNKS_DIR, entry);
+    try {
+      if (Date.now() - fs.statSync(p).mtimeMs > CHUNK_MAX_AGE) {
+        fs.rmSync(p, { recursive: true, force: true });
+        console.log(`Cleaned up stale chunks: ${entry}`);
+      }
+    } catch {}
+  }
+}
+cleanStaleChunks();
+setInterval(cleanStaleChunks, 10 * 60 * 1000);
+
 app.use(express.json());
 app.use(cookieParser());
 
