@@ -18,7 +18,7 @@ function formatDuration(seconds) {
 }
 
 export default function FileManager() {
-  const [files, setFiles] = useState([]);
+  const [files, setFiles] = useState(null); // null = loading
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(null); // { current, total }
   const inputRef = useRef(null);
@@ -37,7 +37,7 @@ export default function FileManager() {
 
   // Poll while any file is transcoding
   useEffect(() => {
-    const hasTranscoding = files.some((f) => f.transcoding);
+    const hasTranscoding = (files || []).some((f) => f.transcoding);
     if (!hasTranscoding) return;
     const interval = setInterval(loadFiles, 3000);
     return () => clearInterval(interval);
@@ -187,7 +187,7 @@ export default function FileManager() {
         </div>
       )}
 
-      {files.length === 0 ? (
+      {files === null ? null : files.length === 0 ? (
         <p className="empty">No files yet</p>
       ) : (
         <table className="file-list">
