@@ -226,6 +226,10 @@ nav button.active {
   padding: 2rem 0;
 }
 
+.empty.loading {
+  animation: pulse 1.5s infinite;
+}
+
 /* Settings */
 .settings {
   display: flex;

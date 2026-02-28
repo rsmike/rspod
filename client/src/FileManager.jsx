@@ -187,7 +187,9 @@ export default function FileManager() {
         </div>
       )}
 
-      {files === null ? null : files.length === 0 ? (
+      {files === null ? (
+        <p className="empty loading">Loading...</p>
+      ) : files.length === 0 ? (
         <p className="empty">No files yet</p>
       ) : (
         <table className="file-list">
