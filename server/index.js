@@ -365,6 +365,19 @@ app.delete('/api/auth', (req, res) => {
   res.json({ ok: true });
 });
 
+// Direct login via URL (bookmarkable: {root}/{key})
+app.get('/:key', (req, res, next) => {
+  const session = findSession(req.params.key);
+  if (!session) return next();
+  res.cookie(SESSION_COOKIE, req.params.key, {
+    httpOnly: true,
+    sameSite: 'strict',
+    maxAge: COOKIE_MAX_AGE,
+    path: '/',
+  });
+  res.redirect('/');
+});
+
 // Cover image — public (RSS feeds reference it)
 app.get('/api/cover', (req, res) => {
   if (fs.existsSync(COVER_FILE)) return res.sendFile(COVER_FILE);
